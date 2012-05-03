@@ -1,4 +1,3 @@
-tasks.send_email({'to': "michael.wirth@dealini.ch", 'to_name': u"Michäel Wirth", 'subject': u"teäst"}, {'message': "asdfaffffasdf"}, "test")
 # encoding: utf-8
 
 import urllib
