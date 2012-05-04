@@ -11,21 +11,19 @@ log = __import__('logging').getLogger(__name__)
 
 
 class PostmarkTransport(object):
-    __slots__ = ('ephemeral', 'key')
+    __slots__ = ('ephemeral', 'key', 'messages')
     
     def __init__(self, config):
         self.key = config.get('key')
+        self.messages = []
     
-    def startup(self):
-        pass
-    
-    def deliver(self, message):
+    def _mapmessage(self, message):
         args = dict({
-                'From': message.author.encode(message.encoding),
-                'To': message.to.encode(message.encoding),
-                'Subject': message.subject.encode(message.encoding),
-                'TextBody': message.plain.encode(message.encoding),
-            })
+            'From': message.author.encode(message.encoding),
+            'To': message.to.encode(message.encoding),
+            'Subject': message.subject.encode(message.encoding),
+            'TextBody': message.plain.encode(message.encoding),
+        })
             
         if message.cc:
             args['Cc'] = message.cc.encode()
@@ -54,9 +52,12 @@ class PostmarkTransport(object):
             """
             raise MailConfigurationException()
 
+        return args
+
+    def _batchsend(self):
         request = urllib2.Request(
-                "https://api.postmarkapp.com/email",
-                json.dumps(args),
+                "https://api.postmarkapp.com/email/batch",
+                json.dumps(self.messages),
                 {
                     'Accept': "application/json",
                     'Content-Type': "application/json",
@@ -70,10 +71,23 @@ class PostmarkTransport(object):
             raise DeliveryFailedException(e, "Could not connect to Postmark.")
         else:
             respcode = response.getcode()
-            if respcode >= 300 and respcode <= 499:
+            if respcode >= 400 and respcode <= 499:
                 raise MessageFailedException(response.read())
             elif respcode >= 500 and respcode <= 599:
                 raise DeliveryFailedException(message, "Postmark service unavailable.")
+
+        del self.messages[:]
+
+    def startup(self):
+        self.messages = []
+    
+    def deliver(self, message):
+        if len(self.messages) >= 500:
+            # Postmark allows to send a maximum of 500 emails over its batch API
+            self._batchsend()
+        
+        args = self._mapmessage(message)
+        self.messages.append(args)
     
     def shutdown(self):
-        pass
+        self._batchsend()
