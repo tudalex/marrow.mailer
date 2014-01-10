@@ -27,8 +27,7 @@ class AmazonTransport(object): # pragma: no cover
     def startup(self):
         self.connection = SESConnection(
                 aws_access_key_id = self.id,
-                aws_secret_access_key = self.key,
-                host = self.host
+                aws_secret_access_key = self.key
             )
     
     def deliver(self, message):
